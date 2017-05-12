@@ -32,6 +32,7 @@ void runLine(char line[]);
 int shouldRunInBackground(char* words[], int numWords);
 void changePrompt(char* newPrompt);
 void createAlias(char* alias, char* command);
+char* findAlias(char* command);
 void terminateProcess();
 
 int main() {
@@ -88,6 +89,9 @@ void executeCommand(char* command, char* options[], int runBackground) {
 	} else if (strcmp(command, aliasCommand) == 0) {	// Create alias
 		createAlias(options[1], options[2]);
 	} else {
+		// Check for aliases
+		char* realCommand = findAlias(command);
+
 		childPID = fork();
 
 		// Error in fork call
@@ -98,7 +102,7 @@ void executeCommand(char* command, char* options[], int runBackground) {
 
 		// Invalid command
 		if (childPID == 0) {
-			execvp(command, options);
+			execvp(realCommand, options);
 			perror("Invalid command");
 			_exit(1);
 		}
@@ -166,8 +170,18 @@ void changePrompt(char* newPrompt) {
 // Create an alias for a command
 void createAlias(char* alias, char* command) {
 	memcpy(aliasList[aliasCount][0], alias, strlen(alias));
-//	memcpy(aliasList[aliasCount][1], command, strlen(command));
+	memcpy(aliasList[aliasCount][1], command, strlen(command));
 	aliasCount++;
+}
+
+// Finds and returns command pointed to by alias or returns command if not alias
+char* findAlias(char* command) {
+	int i;
+	for (i = 0; i < aliasCount; ++i)
+		if (strcmp(aliasList[i][0], command) == 0)
+			return aliasList[i][1];
+
+	return command;
 }
 
 // Kill a child process
