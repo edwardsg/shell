@@ -28,7 +28,7 @@ int parseWords(char line[], char* words[]);
 void executeCommand(char* command, char* options[], int runBackground);
 void exitShell();
 void runBatchFile(char* filePath);
-void runLine(char line[]);
+void runLine(char* line);
 int shouldRunInBackground(char* words[], int numWords);
 void changePrompt(char* newPrompt);
 void createAlias(char* alias, char* command);
@@ -41,6 +41,9 @@ int main() {
 
 	// Install signal handler for child process termination
 	signal(SIGINT, terminateProcess);
+
+	// Load initialization file
+	runBatchFile("init");	
 
 	// Start the shell
 	runShell();
@@ -81,6 +84,7 @@ void readLine(char lineBuffer[]) {
 // Runs a command, including built in functions, optionally run in background
 void executeCommand(char* command, char* options[], int runBackground) {	
 	if (strcmp(command, exitCommand) == 0) {			// Exit
+		printf("Goodbye\n");
 		exitShell();	
 	} else if (strcmp(command, batchCommand) == 0) {	// Run batch file
 		runBatchFile(options[1]);
@@ -138,7 +142,7 @@ void runBatchFile(char* filePath) {
 }
 
 // Finds and executes command from the input line
-void runLine(char line[]) {
+void runLine(char* line) {
 	char* words[20];	// Holds line split into words
 	char* command;		// Command to execute
 
@@ -198,6 +202,9 @@ int parseWords(char line[], char* words[]) {
 
 	token = strtok(line, " ");
 	while (token != NULL) {
+		if (token[strlen(token) - 1] == '\n')
+			token[strlen(token) - 1] = '\0';
+
 		if (insideQuotes) {
 			word = strcat(word, token);
 			word = strcat(word, " ");
