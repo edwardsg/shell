@@ -19,10 +19,19 @@ char* runBackgroundSymbol = "&";
 pid_t thisPID;
 pid_t childPID;
 
+char aliasList[256][2][100];
+int aliasCount = 0;
+
 void runShell();
 void readLine(char lineBuffer[]);
 int parseWords(char line[], char* words[]);
 void executeCommand(char* command, char* options[], int runBackground);
+void exitShell();
+void runBatchFile(char* filePath);
+void runLine(char line[]);
+int shouldRunInBackground(char* words[], int numWords);
+void changePrompt(char* newPrompt);
+void createAlias(char* alias, char* command);
 void terminateProcess();
 
 int main() {
@@ -32,6 +41,7 @@ int main() {
 	// Install signal handler for child process termination
 	signal(SIGINT, terminateProcess);
 
+	// Start the shell
 	runShell();
 
 	return 0;
@@ -40,8 +50,6 @@ int main() {
 // Runs main loop of shell
 void runShell() {
 	char line[256];		// Holds entire user input line
-	char* words[20];	// Holds line split into words
-	char* command;		// Command to execute
 	int status;
 
 	while (1) {
@@ -51,22 +59,11 @@ void runShell() {
 		// Show user prompt
 		printf("%s ", prompt);
 
+		// Get input line
 		readLine(line);
 
-		// Find and execute command
-		int runBackground = FALSE;
-		if (line[0] != '\0') {
-			int numWords = parseWords(line, words);
-			command = words[0];
-
-			// Determine if command process should run in background
-			if (strcmp(words[numWords - 1], runBackgroundSymbol) == 0) {
-				runBackground = TRUE;
-				words[numWords - 1] = '\0'; // Remove symbol from words
-			}
-
-			executeCommand(command, words, runBackground);
-		}
+		// Run command
+		runLine(line);
 	}
 }
 
@@ -83,15 +80,15 @@ void readLine(char lineBuffer[]) {
 // Runs a command, including built in functions, optionally run in background
 void executeCommand(char* command, char* options[], int runBackground) {	
 	if (strcmp(command, exitCommand) == 0) {			// Exit
-		_exit(0);
+		exitShell();	
 	} else if (strcmp(command, batchCommand) == 0) {	// Run batch file
-
+		runBatchFile(options[1]);
 	} else if (strcmp(command, promptCommand) == 0) {	// Change prompt
-		prompt = options[1];
+		changePrompt(options[1]);
 	} else if (strcmp(command, aliasCommand) == 0) {	// Create alias
-
+		createAlias(options[1], options[2]);
 	} else {
-		pid_t childPID = fork();
+		childPID = fork();
 
 		// Error in fork call
 		if (childPID == -1) {
@@ -112,6 +109,65 @@ void executeCommand(char* command, char* options[], int runBackground) {
 			waitpid(childPID, &status, 0);
 		}
 	}	
+}
+
+// Exit the shell program
+void exitShell() {
+	_exit(0);
+}
+
+// Run a batch program from a file
+void runBatchFile(char* filePath) {
+	FILE *file = fopen(filePath, "r");
+	char line[100];
+
+	if (file == NULL) {
+		perror("File not found.\n");
+		return;
+	}
+
+	while (fgets(line, 100, file) != NULL) {
+		runLine(line);
+	}
+
+	fclose(file);
+}
+
+// Finds and executes command from the input line
+void runLine(char line[]) {
+	char* words[20];	// Holds line split into words
+	char* command;		// Command to execute
+
+	if (line[0] != '\0') {
+		int numWords = parseWords(line, words);
+		command = words[0];
+
+		int runBackground = shouldRunInBackground(words, numWords);
+		if (runBackground)
+			words[numWords - 1] = '\0'; // Remove symbol from words
+
+		executeCommand(command, words, runBackground);
+	}
+}
+
+// Determines if command process should run in background
+int shouldRunInBackground(char* words[], int numWords) {
+	if (strcmp(words[numWords - 1], runBackgroundSymbol) == 0)
+		return TRUE;
+
+	return FALSE;
+}
+
+// Change the user prompt
+void changePrompt(char* newPrompt) {
+	prompt = newPrompt;
+}
+
+// Create an alias for a command
+void createAlias(char* alias, char* command) {
+	memcpy(aliasList[aliasCount][0], alias, strlen(alias));
+//	memcpy(aliasList[aliasCount][1], command, strlen(command));
+	aliasCount++;
 }
 
 // Kill a child process
